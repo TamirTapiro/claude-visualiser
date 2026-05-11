@@ -1,8 +1,6 @@
 ---
 name: open
 description: Open the Claude Visualiser dashboard in your browser and show current status
-triggers:
-  - /visualiser:open
 ---
 
 Print the following and nothing else:
