@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Real-time visualiser for Claude Code sessions — live agent graph, tool timeline, token usage.",
   "author": { "name": "tapir", "url": "https://github.com/tapir" },
-  "repository": "https://github.com/tapir/claude-visualiser",
+  "repository": "https://github.com/TamirTapiro/claude-visualiser",
   "license": "MIT",
   "skills": "./skills/",
   "hooks": "./hooks/hooks.json",

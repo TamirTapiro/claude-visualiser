@@ -4,6 +4,7 @@
   "private": true,
   "description": "Build-time dependencies for claude-visualiser",
   "type": "module",
+  "repository": "https://github.com/TamirTapiro/claude-visualiser",
   "scripts": {
     "build": "node build.js",
     "build:watch": "node build.js --watch"
