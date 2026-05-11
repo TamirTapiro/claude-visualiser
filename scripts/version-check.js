@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join } from 'path';
 import { homedir } from 'os';
 import { execSync } from 'child_process';
-import { fileURLToPath } from 'url';
 
 const DATA_DIR = join(homedir(), '.claude-visualiser');
 
@@ -31,7 +30,7 @@ mkdirSync(DATA_DIR, { recursive: true });
 const sqlitePath = join(DATA_DIR, 'node_modules', 'better-sqlite3');
 if (!existsSync(sqlitePath)) {
   try {
-    execSync(`npm install --prefix "${DATA_DIR}" better-sqlite3 --save false --loglevel error`, {
+    execSync(`npm install --prefix "${DATA_DIR}" better-sqlite3 --no-save --loglevel error`, {
       stdio: 'pipe',
       timeout: 120000,
       env: { ...process.env, npm_config_optional: 'false' },
