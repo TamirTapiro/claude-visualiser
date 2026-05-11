@@ -56,12 +56,13 @@ async function killWorker() {
       log(`taskkill failed: ${e}`);
     }
   } else {
-    child.kill('SIGTERM');
+    const localChild = child;
+    localChild.kill('SIGTERM');
     await Promise.race([
-      new Promise(r => child?.on('exit', r)),
+      new Promise(r => localChild.on('exit', r)),
       new Promise(r => setTimeout(r, 5000)),
     ]);
-    if (child && !child.killed) child.kill('SIGKILL');
+    if (!localChild.killed) localChild.kill('SIGKILL');
   }
 
   await waitForPid(pid, 5000);
@@ -73,12 +74,12 @@ async function waitForPid(pid, timeout) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     try { process.kill(pid, 0); await new Promise(r => setTimeout(r, 100)); }
-    catch { return; }
+    catch (e) { if (e.code === 'ESRCH') return; }
   }
 }
 
-process.on('SIGTERM', async () => { shuttingDown = true; await killWorker(); process.exit(0); });
-process.on('SIGINT', async () => { shuttingDown = true; await killWorker(); process.exit(0); });
+process.on('SIGTERM', async () => { if (shuttingDown) return; shuttingDown = true; await killWorker(); process.exit(0); });
+process.on('SIGINT', async () => { if (shuttingDown) return; shuttingDown = true; await killWorker(); process.exit(0); });
 
 log('Wrapper starting');
 spawnWorker();
