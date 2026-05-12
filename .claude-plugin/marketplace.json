@@ -1,0 +1,18 @@
+{
+  "name": "tapir",
+  "owner": {
+    "name": "Tamir Tapiro"
+  },
+  "metadata": {
+    "description": "Plugins by Tamir Tapiro",
+    "homepage": "https://github.com/TamirTapiro/claude-visualiser"
+  },
+  "plugins": [
+    {
+      "name": "claude-visualiser",
+      "version": "1.0.0",
+      "source": "./",
+      "description": "Real-time visualiser for Claude Code sessions — live agent graph, tool timeline, token usage."
+    }
+  ]
+}
