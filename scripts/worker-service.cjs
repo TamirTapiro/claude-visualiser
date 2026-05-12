@@ -1,44 +1,39 @@
+#!/usr/bin/env bun
 "use strict";
-var __defProp = Object.defineProperty;
-var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+"use strict";
 var __getOwnPropNames = Object.getOwnPropertyNames;
-var __hasOwnProp = Object.prototype.hasOwnProperty;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
-var __copyProps = (to, from, except, desc) => {
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (let key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(to, key) && key !== except)
-        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
-  }
-  return to;
-};
-var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // src/worker/db.js
-var db_exports = {};
-function getDb() {
-  if (db) return db;
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  const sqlitePath = path.join(DATA_DIR, "node_modules", "better-sqlite3");
-  let Database;
-  try {
-    Database = require(sqlitePath);
-  } catch {
-    Database = require("better-sqlite3");
-  }
-  db = new Database(DB_PATH);
-  db.pragma("journal_mode = WAL");
-  db.pragma("synchronous = NORMAL");
-  initSchema(db);
-  return db;
-}
-function initSchema(db4) {
-  db4.exec(`
+var require_db = __commonJS({
+  "src/worker/db.js"(exports2, module2) {
+    "use strict";
+    var path2 = require("path");
+    var fs2 = require("fs");
+    var os2 = require("os");
+    var DATA_DIR2 = process.env.CLAUDE_VIS_DATA_DIR || path2.join(os2.homedir(), ".claude-visualiser");
+    var DB_PATH = path2.join(DATA_DIR2, "data.db");
+    var db = null;
+    function getDb() {
+      if (db) return db;
+      fs2.mkdirSync(DATA_DIR2, { recursive: true });
+      const sqlitePath = path2.join(DATA_DIR2, "node_modules", "better-sqlite3");
+      let Database;
+      try {
+        Database = require(sqlitePath);
+      } catch {
+        Database = require("better-sqlite3");
+      }
+      db = new Database(DB_PATH);
+      db.pragma("journal_mode = WAL");
+      db.pragma("synchronous = NORMAL");
+      initSchema(db);
+      return db;
+    }
+    function initSchema(db2) {
+      db2.exec(`
     CREATE TABLE IF NOT EXISTS sessions (
       session_id   TEXT PRIMARY KEY,
       project_name TEXT,
@@ -83,35 +78,35 @@ function initSchema(db4) {
     CREATE INDEX IF NOT EXISTS idx_agents_session ON agents(session_id);
     CREATE INDEX IF NOT EXISTS idx_token_session ON token_usage(session_id);
   `);
-}
-function upsertSession({ session_id, project_name, cwd, started_at }) {
-  const db4 = getDb();
-  const now = Date.now();
-  db4.prepare(`
+    }
+    function upsertSession({ session_id, project_name, cwd, started_at }) {
+      const db2 = getDb();
+      const now = Date.now();
+      db2.prepare(`
     INSERT INTO sessions (session_id, project_name, cwd, status, started_at, last_activity)
     VALUES (?, ?, ?, 'active', ?, ?)
     ON CONFLICT(session_id) DO UPDATE SET
       last_activity = excluded.last_activity,
       status = 'active'
   `).run(session_id, project_name, cwd, started_at ?? now, now);
-}
-function touchSession(session_id) {
-  getDb().prepare(
-    `UPDATE sessions SET last_activity = ?, status = 'active' WHERE session_id = ?`
-  ).run(Date.now(), session_id);
-}
-function markSessionIdle(session_id) {
-  getDb().prepare(
-    `UPDATE sessions SET status = 'idle', last_activity = ? WHERE session_id = ?`
-  ).run(Date.now(), session_id);
-}
-function updateContextSummary(session_id, summary) {
-  getDb().prepare(
-    `UPDATE sessions SET context_summary = ? WHERE session_id = ?`
-  ).run(summary, session_id);
-}
-function listSessions() {
-  return getDb().prepare(`
+    }
+    function touchSession(session_id) {
+      getDb().prepare(
+        `UPDATE sessions SET last_activity = ?, status = 'active' WHERE session_id = ?`
+      ).run(Date.now(), session_id);
+    }
+    function markSessionIdle(session_id) {
+      getDb().prepare(
+        `UPDATE sessions SET status = 'idle', last_activity = ? WHERE session_id = ?`
+      ).run(Date.now(), session_id);
+    }
+    function updateContextSummary(session_id, summary) {
+      getDb().prepare(
+        `UPDATE sessions SET context_summary = ? WHERE session_id = ?`
+      ).run(summary, session_id);
+    }
+    function listSessions() {
+      return getDb().prepare(`
     SELECT s.*,
       COALESCE(SUM(tu.prompt_tokens), 0)     AS total_prompt_tokens,
       COALESCE(SUM(tu.completion_tokens), 0) AS total_completion_tokens,
@@ -122,111 +117,103 @@ function listSessions() {
     GROUP BY s.session_id
     ORDER BY s.last_activity DESC
   `).all();
-}
-function getSession(session_id) {
-  return getDb().prepare(`SELECT * FROM sessions WHERE session_id = ?`).get(session_id);
-}
-function upsertAgent({ agent_id, session_id, parent_id, started_at }) {
-  getDb().prepare(`
+    }
+    function getSession(session_id) {
+      return getDb().prepare(`SELECT * FROM sessions WHERE session_id = ?`).get(session_id);
+    }
+    function upsertAgent({ agent_id, session_id, parent_id, started_at }) {
+      getDb().prepare(`
     INSERT INTO agents (agent_id, session_id, parent_id, status, started_at)
     VALUES (?, ?, ?, 'active', ?)
     ON CONFLICT(agent_id) DO NOTHING
   `).run(agent_id, session_id, parent_id ?? null, started_at ?? Date.now());
-}
-function markAgentEnded(agent_id) {
-  getDb().prepare(
-    `UPDATE agents SET status = 'ended', ended_at = ? WHERE agent_id = ?`
-  ).run(Date.now(), agent_id);
-}
-function getAgentsBySession(session_id) {
-  return getDb().prepare(`SELECT * FROM agents WHERE session_id = ? ORDER BY started_at ASC`).all(session_id);
-}
-function insertToolCall({ session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes }) {
-  return getDb().prepare(`
+    }
+    function markAgentEnded(agent_id) {
+      getDb().prepare(
+        `UPDATE agents SET status = 'ended', ended_at = ? WHERE agent_id = ?`
+      ).run(Date.now(), agent_id);
+    }
+    function getAgentsBySession(session_id) {
+      return getDb().prepare(`SELECT * FROM agents WHERE session_id = ? ORDER BY started_at ASC`).all(session_id);
+    }
+    function insertToolCall({ session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes }) {
+      return getDb().prepare(`
     INSERT INTO tool_calls (session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes, timestamp)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(session_id, agent_id, tool_name, duration_ms ?? null, input_bytes ?? 0, output_bytes ?? 0, Date.now());
-}
-function getActivityLog(session_id, limit = 200, offset = 0) {
-  return getDb().prepare(`
+    }
+    function getActivityLog(session_id, limit = 200, offset = 0) {
+      return getDb().prepare(`
     SELECT * FROM tool_calls WHERE session_id = ?
     ORDER BY timestamp DESC LIMIT ? OFFSET ?
   `).all(session_id, limit, offset);
-}
-function getGraphData(session_id) {
-  const agents = getAgentsBySession(session_id);
-  const tools = getDb().prepare(`
+    }
+    function getGraphData(session_id) {
+      const agents = getAgentsBySession(session_id);
+      const tools = getDb().prepare(`
     SELECT agent_id, tool_name, COUNT(*) as call_count, SUM(duration_ms) as total_ms
     FROM tool_calls WHERE session_id = ?
     GROUP BY agent_id, tool_name
   `).all(session_id);
-  const nodes = [];
-  const edges = [];
-  for (const a of agents) {
-    nodes.push({
-      id: a.agent_id,
-      type: a.parent_id ? "subagent" : "main",
-      label: a.agent_id,
-      status: a.status
-    });
-    if (a.parent_id) {
-      edges.push({ source: a.parent_id, target: a.agent_id, type: "spawned" });
+      const nodes = [];
+      const edges = [];
+      for (const a of agents) {
+        nodes.push({
+          id: a.agent_id,
+          type: a.parent_id ? "subagent" : "main",
+          label: a.agent_id,
+          status: a.status
+        });
+        if (a.parent_id) {
+          edges.push({ source: a.parent_id, target: a.agent_id, type: "spawned" });
+        }
+      }
+      const toolNodeIds = /* @__PURE__ */ new Set();
+      for (const t of tools) {
+        const isMcp = t.tool_name.startsWith("mcp__");
+        const isSkill = t.tool_name.startsWith("skill__") || t.tool_name.includes(":");
+        const nodeType = isMcp ? "mcp" : isSkill ? "skill" : "tool";
+        const nodeId = `tool:${t.agent_id}:${t.tool_name}`;
+        if (!toolNodeIds.has(nodeId)) {
+          toolNodeIds.add(nodeId);
+          nodes.push({ id: nodeId, type: nodeType, label: t.tool_name, callCount: t.call_count, totalMs: t.total_ms });
+        }
+        edges.push({ source: t.agent_id, target: nodeId, type: "tool_call", callCount: t.call_count });
+      }
+      return { nodes, edges };
     }
-  }
-  const toolNodeIds = /* @__PURE__ */ new Set();
-  for (const t of tools) {
-    const isMcp = t.tool_name.startsWith("mcp__");
-    const isSkill = t.tool_name.startsWith("skill__") || t.tool_name.includes(":");
-    const nodeType = isMcp ? "mcp" : isSkill ? "skill" : "tool";
-    const nodeId = `tool:${t.agent_id}:${t.tool_name}`;
-    if (!toolNodeIds.has(nodeId)) {
-      toolNodeIds.add(nodeId);
-      nodes.push({ id: nodeId, type: nodeType, label: t.tool_name, callCount: t.call_count, totalMs: t.total_ms });
-    }
-    edges.push({ source: t.agent_id, target: nodeId, type: "tool_call", callCount: t.call_count });
-  }
-  return { nodes, edges };
-}
-function insertTokenUsage({ session_id, agent_id, prompt_tokens, completion_tokens }) {
-  getDb().prepare(`
+    function insertTokenUsage({ session_id, agent_id, prompt_tokens, completion_tokens }) {
+      getDb().prepare(`
     INSERT INTO token_usage (session_id, agent_id, prompt_tokens, completion_tokens, timestamp)
     VALUES (?, ?, ?, ?, ?)
   `).run(session_id, agent_id, prompt_tokens ?? 0, completion_tokens ?? 0, Date.now());
-}
-function getTokenBreakdown(session_id) {
-  return getDb().prepare(`
+    }
+    function getTokenBreakdown(session_id) {
+      return getDb().prepare(`
     SELECT agent_id,
       SUM(prompt_tokens)     AS prompt_tokens,
       SUM(completion_tokens) AS completion_tokens
     FROM token_usage WHERE session_id = ?
     GROUP BY agent_id
   `).all(session_id);
-}
-var path, fs, os, DATA_DIR, DB_PATH, db;
-var init_db = __esm({
-  "src/worker/db.js"() {
-    "use strict";
-    path = require("path");
-    fs = require("fs");
-    os = require("os");
-    DATA_DIR = process.env.CLAUDE_VIS_DATA_DIR || path.join(os.homedir(), ".claude-visualiser");
-    DB_PATH = path.join(DATA_DIR, "data.db");
-    db = null;
-    db_exports.getDb = getDb;
-    db_exports.upsertSession = upsertSession;
-    db_exports.touchSession = touchSession;
-    db_exports.markSessionIdle = markSessionIdle;
-    db_exports.updateContextSummary = updateContextSummary;
-    db_exports.listSessions = listSessions;
-    db_exports.getSession = getSession;
-    db_exports.upsertAgent = upsertAgent;
-    db_exports.markAgentEnded = markAgentEnded;
-    db_exports.getAgentsBySession = getAgentsBySession;
-    db_exports.insertToolCall = insertToolCall;
-    db_exports.getActivityLog = getActivityLog;
-    db_exports.getGraphData = getGraphData;
-    db_exports.insertTokenUsage = insertTokenUsage;
-    db_exports.getTokenBreakdown = getTokenBreakdown;
+    }
+    module2.exports = {
+      getDb,
+      upsertSession,
+      touchSession,
+      markSessionIdle,
+      updateContextSummary,
+      listSessions,
+      getSession,
+      upsertAgent,
+      markAgentEnded,
+      getAgentsBySession,
+      insertToolCall,
+      getActivityLog,
+      getGraphData,
+      insertTokenUsage,
+      getTokenBreakdown
+    };
   }
 });
 
@@ -2460,7 +2447,7 @@ var require_websocket = __commonJS({
     var protocolVersions = [8, 13];
     var readyStates = ["CONNECTING", "OPEN", "CLOSING", "CLOSED"];
     var subprotocolRegex = /^[!#$%&'*+\-.0-9A-Z^_`|a-z~]+$/;
-    var WebSocket2 = class _WebSocket extends EventEmitter {
+    var WebSocket = class _WebSocket extends EventEmitter {
       /**
        * Create a new `WebSocket`.
        *
@@ -2830,35 +2817,35 @@ var require_websocket = __commonJS({
         }
       }
     };
-    Object.defineProperty(WebSocket2, "CONNECTING", {
+    Object.defineProperty(WebSocket, "CONNECTING", {
       enumerable: true,
       value: readyStates.indexOf("CONNECTING")
     });
-    Object.defineProperty(WebSocket2.prototype, "CONNECTING", {
+    Object.defineProperty(WebSocket.prototype, "CONNECTING", {
       enumerable: true,
       value: readyStates.indexOf("CONNECTING")
     });
-    Object.defineProperty(WebSocket2, "OPEN", {
+    Object.defineProperty(WebSocket, "OPEN", {
       enumerable: true,
       value: readyStates.indexOf("OPEN")
     });
-    Object.defineProperty(WebSocket2.prototype, "OPEN", {
+    Object.defineProperty(WebSocket.prototype, "OPEN", {
       enumerable: true,
       value: readyStates.indexOf("OPEN")
     });
-    Object.defineProperty(WebSocket2, "CLOSING", {
+    Object.defineProperty(WebSocket, "CLOSING", {
       enumerable: true,
       value: readyStates.indexOf("CLOSING")
     });
-    Object.defineProperty(WebSocket2.prototype, "CLOSING", {
+    Object.defineProperty(WebSocket.prototype, "CLOSING", {
       enumerable: true,
       value: readyStates.indexOf("CLOSING")
     });
-    Object.defineProperty(WebSocket2, "CLOSED", {
+    Object.defineProperty(WebSocket, "CLOSED", {
       enumerable: true,
       value: readyStates.indexOf("CLOSED")
     });
-    Object.defineProperty(WebSocket2.prototype, "CLOSED", {
+    Object.defineProperty(WebSocket.prototype, "CLOSED", {
       enumerable: true,
       value: readyStates.indexOf("CLOSED")
     });
@@ -2871,10 +2858,10 @@ var require_websocket = __commonJS({
       "readyState",
       "url"
     ].forEach((property) => {
-      Object.defineProperty(WebSocket2.prototype, property, { enumerable: true });
+      Object.defineProperty(WebSocket.prototype, property, { enumerable: true });
     });
     ["open", "error", "close", "message"].forEach((method) => {
-      Object.defineProperty(WebSocket2.prototype, `on${method}`, {
+      Object.defineProperty(WebSocket.prototype, `on${method}`, {
         enumerable: true,
         get() {
           for (const listener of this.listeners(method)) {
@@ -2896,9 +2883,9 @@ var require_websocket = __commonJS({
         }
       });
     });
-    WebSocket2.prototype.addEventListener = addEventListener;
-    WebSocket2.prototype.removeEventListener = removeEventListener;
-    module2.exports = WebSocket2;
+    WebSocket.prototype.addEventListener = addEventListener;
+    WebSocket.prototype.removeEventListener = removeEventListener;
+    module2.exports = WebSocket;
     function initAsClient(websocket, address, protocols, options) {
       const opts = {
         allowSynchronousEvents: true,
@@ -3086,7 +3073,7 @@ var require_websocket = __commonJS({
       });
       req.on("upgrade", (res, socket, head) => {
         websocket.emit("upgrade", res);
-        if (websocket.readyState !== WebSocket2.CONNECTING) return;
+        if (websocket.readyState !== WebSocket.CONNECTING) return;
         req = websocket._req = null;
         const upgrade = res.headers.upgrade;
         if (upgrade === void 0 || upgrade.toLowerCase() !== "websocket") {
@@ -3158,7 +3145,7 @@ var require_websocket = __commonJS({
       }
     }
     function emitErrorAndClose(websocket, err) {
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket.CLOSING;
       websocket._errorEmitted = true;
       websocket.emit("error", err);
       websocket.emitClose();
@@ -3175,7 +3162,7 @@ var require_websocket = __commonJS({
       return tls.connect(options);
     }
     function abortHandshake(websocket, stream, message) {
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket.CLOSING;
       const err = new Error(message);
       Error.captureStackTrace(err, abortHandshake);
       if (stream.setHeader) {
@@ -3250,9 +3237,9 @@ var require_websocket = __commonJS({
     }
     function senderOnError(err) {
       const websocket = this[kWebSocket];
-      if (websocket.readyState === WebSocket2.CLOSED) return;
-      if (websocket.readyState === WebSocket2.OPEN) {
-        websocket._readyState = WebSocket2.CLOSING;
+      if (websocket.readyState === WebSocket.CLOSED) return;
+      if (websocket.readyState === WebSocket.OPEN) {
+        websocket._readyState = WebSocket.CLOSING;
         setCloseTimer(websocket);
       }
       this._socket.end();
@@ -3272,7 +3259,7 @@ var require_websocket = __commonJS({
       this.removeListener("close", socketOnClose);
       this.removeListener("data", socketOnData);
       this.removeListener("end", socketOnEnd);
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket.CLOSING;
       if (!this._readableState.endEmitted && !websocket._closeFrameReceived && !websocket._receiver._writableState.errorEmitted && this._readableState.length !== 0) {
         const chunk = this.read(this._readableState.length);
         websocket._receiver.write(chunk);
@@ -3294,7 +3281,7 @@ var require_websocket = __commonJS({
     }
     function socketOnEnd() {
       const websocket = this[kWebSocket];
-      websocket._readyState = WebSocket2.CLOSING;
+      websocket._readyState = WebSocket.CLOSING;
       websocket._receiver.end();
       this.end();
     }
@@ -3303,7 +3290,7 @@ var require_websocket = __commonJS({
       this.removeListener("error", socketOnError);
       this.on("error", NOOP);
       if (websocket) {
-        websocket._readyState = WebSocket2.CLOSING;
+        websocket._readyState = WebSocket.CLOSING;
         this.destroy();
       }
     }
@@ -3314,7 +3301,7 @@ var require_websocket = __commonJS({
 var require_stream = __commonJS({
   "node_modules/ws/lib/stream.js"(exports2, module2) {
     "use strict";
-    var WebSocket2 = require_websocket();
+    var WebSocket = require_websocket();
     var { Duplex } = require("stream");
     function emitClose(stream) {
       stream.emit("close");
@@ -3464,13 +3451,13 @@ var require_websocket_server = __commonJS({
     var extension = require_extension();
     var PerMessageDeflate = require_permessage_deflate();
     var subprotocol = require_subprotocol();
-    var WebSocket2 = require_websocket();
+    var WebSocket = require_websocket();
     var { CLOSE_TIMEOUT, GUID, kWebSocket } = require_constants();
     var keyRegex = /^[+/0-9A-Za-z]{22}==$/;
     var RUNNING = 0;
     var CLOSING = 1;
     var CLOSED = 2;
-    var WebSocketServer2 = class extends EventEmitter {
+    var WebSocketServer = class extends EventEmitter {
       /**
        * Create a `WebSocketServer` instance.
        *
@@ -3524,7 +3511,7 @@ var require_websocket_server = __commonJS({
           host: null,
           path: null,
           port: null,
-          WebSocket: WebSocket2,
+          WebSocket,
           ...options
         };
         if (options.port == null && !options.server && !options.noServer || options.port != null && (options.server || options.noServer) || options.server && options.noServer) {
@@ -3804,7 +3791,7 @@ var require_websocket_server = __commonJS({
         cb(ws, req);
       }
     };
-    module2.exports = WebSocketServer2;
+    module2.exports = WebSocketServer;
     function addListeners(server, map) {
       for (const event of Object.keys(map)) server.on(event, map[event]);
       return function removeListeners() {
@@ -3856,266 +3843,261 @@ var require_ws = __commonJS({
     var Receiver = require_receiver();
     var Sender = require_sender();
     var subprotocol = require_subprotocol();
-    var WebSocket2 = require_websocket();
-    var WebSocketServer2 = require_websocket_server();
-    WebSocket2.createWebSocketStream = createWebSocketStream;
-    WebSocket2.extension = extension;
-    WebSocket2.PerMessageDeflate = PerMessageDeflate;
-    WebSocket2.Receiver = Receiver;
-    WebSocket2.Sender = Sender;
-    WebSocket2.Server = WebSocketServer2;
-    WebSocket2.subprotocol = subprotocol;
-    WebSocket2.WebSocket = WebSocket2;
-    WebSocket2.WebSocketServer = WebSocketServer2;
-    module2.exports = WebSocket2;
+    var WebSocket = require_websocket();
+    var WebSocketServer = require_websocket_server();
+    WebSocket.createWebSocketStream = createWebSocketStream;
+    WebSocket.extension = extension;
+    WebSocket.PerMessageDeflate = PerMessageDeflate;
+    WebSocket.Receiver = Receiver;
+    WebSocket.Sender = Sender;
+    WebSocket.Server = WebSocketServer;
+    WebSocket.subprotocol = subprotocol;
+    WebSocket.WebSocket = WebSocket;
+    WebSocket.WebSocketServer = WebSocketServer;
+    module2.exports = WebSocket;
   }
 });
 
 // src/worker/ws.js
-var ws_exports = {};
-function attachWebSocket(server) {
-  wss = new WebSocketServer({ server, path: "/ws" });
-  wss.on("connection", (ws) => {
-    ws.on("error", () => {
-    });
-    ws.send(JSON.stringify({ type: "connected", timestamp: Date.now() }));
-  });
-  return wss;
-}
-function broadcast(event) {
-  if (!wss) return;
-  const msg = JSON.stringify(event);
-  for (const client of wss.clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(msg);
-    }
-  }
-}
-var WebSocketServer, WebSocket, wss;
-var init_ws = __esm({
-  "src/worker/ws.js"() {
+var require_ws2 = __commonJS({
+  "src/worker/ws.js"(exports2, module2) {
     "use strict";
-    ({ WebSocketServer, WebSocket } = require_ws());
-    wss = null;
-    ws_exports.attachWebSocket = attachWebSocket;
-    ws_exports.broadcast = broadcast;
+    var { WebSocketServer, WebSocket } = require_ws();
+    var wss = null;
+    function attachWebSocket(server) {
+      wss = new WebSocketServer({ server, path: "/ws" });
+      wss.on("connection", (ws) => {
+        ws.on("error", () => {
+        });
+        ws.send(JSON.stringify({ type: "connected", timestamp: Date.now() }));
+      });
+      return wss;
+    }
+    function broadcast(event) {
+      if (!wss) return;
+      const msg = JSON.stringify(event);
+      for (const client of wss.clients) {
+        if (client.readyState === WebSocket.OPEN) {
+          client.send(msg);
+        }
+      }
+    }
+    module2.exports = { attachWebSocket, broadcast };
   }
 });
 
 // src/worker/hooks.js
-var hooks_exports = {};
-function deriveProjectName(cwd) {
-  if (!cwd) return "unknown";
-  return cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "unknown";
-}
-function ensureSession(payload) {
-  const session_id = payload.session_id;
-  if (!session_id) return null;
-  const cwd = payload.cwd || "";
-  const project_name = deriveProjectName(cwd);
-  db2.upsertSession({ session_id, project_name, cwd, started_at: Date.now() });
-  const mainAgentId = `main:${session_id}`;
-  db2.upsertAgent({ agent_id: mainAgentId, session_id, parent_id: null });
-  return { session_id, project_name, main_agent_id: mainAgentId };
-}
-function handleSessionStart(payload) {
-  const ctx = ensureSession(payload);
-  if (!ctx) return;
-  broadcast2({
-    type: "session_start",
-    session_id: ctx.session_id,
-    project_name: ctx.project_name,
-    timestamp: Date.now()
-  });
-}
-function handleUserPrompt(payload) {
-  const session_id = payload.session_id;
-  if (!session_id) return;
-  const prompt = String(payload.prompt || payload.message || "").slice(0, 150);
-  db2.updateContextSummary(session_id, prompt);
-  broadcast2({ type: "context_update", session_id, summary: prompt, timestamp: Date.now() });
-}
-function handleToolUse(payload) {
-  const session_id = payload.session_id;
-  if (!session_id) return;
-  const tool_name = payload.tool_name || payload.tool || "unknown";
-  const agent_id = payload.agent_id || `main:${session_id}`;
-  const duration_ms = payload.duration_ms ?? null;
-  const input_bytes = payload.tool_input ? JSON.stringify(payload.tool_input).length : 0;
-  const output_bytes = payload.tool_response ? JSON.stringify(payload.tool_response).length : 0;
-  ensureSession(payload);
-  db2.touchSession(session_id);
-  db2.upsertAgent({ agent_id, session_id, parent_id: `main:${session_id}` === agent_id ? null : `main:${session_id}` });
-  db2.insertToolCall({ session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes });
-  broadcast2({
-    type: "tool_call",
-    session_id,
-    agent_id,
-    tool_name,
-    duration_ms,
-    input_bytes,
-    output_bytes,
-    timestamp: Date.now()
-  });
-}
-function handleSessionStop(payload) {
-  const session_id = payload.session_id;
-  if (!session_id) return;
-  db2.markSessionIdle(session_id);
-  const transcriptPath = payload.transcript_path;
-  if (transcriptPath) {
-    parseTranscriptAsync(transcriptPath, session_id, `main:${session_id}`);
-  }
-  broadcast2({ type: "session_end", session_id, timestamp: Date.now() });
-}
-function handleAgentStop(payload) {
-  const agent_id = payload.agent_id;
-  const session_id = payload.session_id;
-  if (!agent_id || !session_id) return;
-  db2.markAgentEnded(agent_id);
-  const transcriptPath = payload.transcript_path;
-  if (transcriptPath) {
-    parseTranscriptAsync(transcriptPath, session_id, agent_id);
-  }
-  broadcast2({ type: "agent_end", session_id, agent_id, timestamp: Date.now() });
-}
-function parseTranscriptAsync(transcriptPath, session_id, agent_id) {
-  setImmediate(() => {
-    try {
-      const lines = fs2.readFileSync(transcriptPath, "utf-8").trim().split("\n");
-      let prompt_tokens = 0;
-      let completion_tokens = 0;
-      for (const line of lines) {
+var require_hooks = __commonJS({
+  "src/worker/hooks.js"(exports2, module2) {
+    "use strict";
+    var fs2 = require("fs");
+    var db = require_db();
+    var { broadcast } = require_ws2();
+    function deriveProjectName(cwd) {
+      if (!cwd) return "unknown";
+      return cwd.replace(/\\/g, "/").split("/").filter(Boolean).pop() || "unknown";
+    }
+    function ensureSession(payload) {
+      const session_id = payload.session_id;
+      if (!session_id) return null;
+      const cwd = payload.cwd || "";
+      const project_name = deriveProjectName(cwd);
+      db.upsertSession({ session_id, project_name, cwd, started_at: Date.now() });
+      const mainAgentId = `main:${session_id}`;
+      db.upsertAgent({ agent_id: mainAgentId, session_id, parent_id: null });
+      return { session_id, project_name, main_agent_id: mainAgentId };
+    }
+    function handleSessionStart(payload) {
+      const ctx = ensureSession(payload);
+      if (!ctx) return;
+      broadcast({
+        type: "session_start",
+        session_id: ctx.session_id,
+        project_name: ctx.project_name,
+        timestamp: Date.now()
+      });
+    }
+    function handleUserPrompt(payload) {
+      const session_id = payload.session_id;
+      if (!session_id) return;
+      const prompt = String(payload.prompt || payload.message || "").slice(0, 150);
+      db.updateContextSummary(session_id, prompt);
+      broadcast({ type: "context_update", session_id, summary: prompt, timestamp: Date.now() });
+    }
+    function handleToolUse(payload) {
+      const session_id = payload.session_id;
+      if (!session_id) return;
+      const tool_name = payload.tool_name || payload.tool || "unknown";
+      const agent_id = payload.agent_id || `main:${session_id}`;
+      const duration_ms = payload.duration_ms ?? null;
+      const input_bytes = payload.tool_input ? JSON.stringify(payload.tool_input).length : 0;
+      const output_bytes = payload.tool_response ? JSON.stringify(payload.tool_response).length : 0;
+      ensureSession(payload);
+      db.touchSession(session_id);
+      db.upsertAgent({ agent_id, session_id, parent_id: `main:${session_id}` === agent_id ? null : `main:${session_id}` });
+      db.insertToolCall({ session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes });
+      broadcast({
+        type: "tool_call",
+        session_id,
+        agent_id,
+        tool_name,
+        duration_ms,
+        input_bytes,
+        output_bytes,
+        timestamp: Date.now()
+      });
+    }
+    function handleSessionStop(payload) {
+      const session_id = payload.session_id;
+      if (!session_id) return;
+      db.markSessionIdle(session_id);
+      const transcriptPath = payload.transcript_path;
+      if (transcriptPath) {
+        parseTranscriptAsync(transcriptPath, session_id, `main:${session_id}`);
+      }
+      broadcast({ type: "session_end", session_id, timestamp: Date.now() });
+    }
+    function handleAgentStop(payload) {
+      const agent_id = payload.agent_id;
+      const session_id = payload.session_id;
+      if (!agent_id || !session_id) return;
+      db.markAgentEnded(agent_id);
+      const transcriptPath = payload.transcript_path;
+      if (transcriptPath) {
+        parseTranscriptAsync(transcriptPath, session_id, agent_id);
+      }
+      broadcast({ type: "agent_end", session_id, agent_id, timestamp: Date.now() });
+    }
+    function parseTranscriptAsync(transcriptPath, session_id, agent_id) {
+      setImmediate(() => {
         try {
-          const entry = JSON.parse(line);
-          if (entry.usage) {
-            prompt_tokens += entry.usage.input_tokens ?? 0;
-            completion_tokens += entry.usage.output_tokens ?? 0;
+          const lines = fs2.readFileSync(transcriptPath, "utf-8").trim().split("\n");
+          let prompt_tokens = 0;
+          let completion_tokens = 0;
+          for (const line of lines) {
+            try {
+              const entry = JSON.parse(line);
+              if (entry.usage) {
+                prompt_tokens += entry.usage.input_tokens ?? 0;
+                completion_tokens += entry.usage.output_tokens ?? 0;
+              }
+            } catch {
+            }
+          }
+          if (prompt_tokens > 0 || completion_tokens > 0) {
+            db.insertTokenUsage({ session_id, agent_id, prompt_tokens, completion_tokens });
+            broadcast({ type: "tokens_updated", session_id, agent_id, prompt_tokens, completion_tokens, timestamp: Date.now() });
           }
         } catch {
         }
-      }
-      if (prompt_tokens > 0 || completion_tokens > 0) {
-        db2.insertTokenUsage({ session_id, agent_id, prompt_tokens, completion_tokens });
-        broadcast2({ type: "tokens_updated", session_id, agent_id, prompt_tokens, completion_tokens, timestamp: Date.now() });
-      }
-    } catch {
+      });
     }
-  });
-}
-function dispatch(eventType, payload) {
-  try {
-    switch (eventType) {
-      case "session-start":
-        return handleSessionStart(payload);
-      case "user-prompt":
-        return handleUserPrompt(payload);
-      case "tool-use":
-        return handleToolUse(payload);
-      case "session-stop":
-        return handleSessionStop(payload);
-      case "agent-stop":
-        return handleAgentStop(payload);
+    function dispatch(eventType, payload) {
+      try {
+        switch (eventType) {
+          case "session-start":
+            return handleSessionStart(payload);
+          case "user-prompt":
+            return handleUserPrompt(payload);
+          case "tool-use":
+            return handleToolUse(payload);
+          case "session-stop":
+            return handleSessionStop(payload);
+          case "agent-stop":
+            return handleAgentStop(payload);
+        }
+      } catch (err) {
+        console.error(`[hooks] dispatch error for ${eventType}: ${err.message}`);
+      }
     }
-  } catch (err) {
-    console.error(`[hooks] dispatch error for ${eventType}: ${err.message}`);
-  }
-}
-var fs2, db2, broadcast2;
-var init_hooks = __esm({
-  "src/worker/hooks.js"() {
-    "use strict";
-    fs2 = require("fs");
-    db2 = (init_db(), __toCommonJS(db_exports));
-    ({ broadcast: broadcast2 } = (init_ws(), __toCommonJS(ws_exports)));
-    hooks_exports.dispatch = dispatch;
+    module2.exports = { dispatch };
   }
 });
 
 // src/worker/api.js
-var api_exports = {};
-function json(res, data, status = 200) {
-  const body = JSON.stringify(data);
-  res.writeHead(status, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
-  res.end(body);
-}
-function parseBody(req) {
-  return new Promise((resolve, reject) => {
-    let data = "";
-    req.on("data", (c) => {
-      data += c;
-      if (data.length > 1e7) reject(new Error("too large"));
-    });
-    req.on("end", () => {
-      try {
-        resolve(JSON.parse(data || "{}"));
-      } catch {
-        resolve({});
-      }
-    });
-    req.on("error", reject);
-  });
-}
-async function handleHook(req, res) {
-  const body = await parseBody(req);
-  const eventType = body.event_type || body.hook_event_name || req.url.split("/").pop();
-  const type = body.vis_event_type || eventType;
-  dispatch2(type, body.payload || body);
-  json(res, { ok: true });
-}
-function handlePing(req, res) {
-  json(res, { ok: true, timestamp: Date.now() });
-}
-function handleListSessions(req, res) {
-  json(res, db3.listSessions());
-}
-function handleGetSession(req, res, session_id) {
-  const session = db3.getSession(session_id);
-  if (!session) return json(res, { error: "not found" }, 404);
-  json(res, session);
-}
-function handleGetGraph(req, res, session_id) {
-  json(res, db3.getGraphData(session_id));
-}
-function handleGetActivity(req, res, session_id) {
-  const url = new URL(req.url, "http://localhost");
-  const limit = parseInt(url.searchParams.get("limit") || "200", 10);
-  const offset = parseInt(url.searchParams.get("offset") || "0", 10);
-  json(res, db3.getActivityLog(session_id, limit, offset));
-}
-function handleGetTokens(req, res, session_id) {
-  json(res, db3.getTokenBreakdown(session_id));
-}
-function handleStats(req, res) {
-  const sessions = db3.listSessions();
-  const active = sessions.filter((s) => s.status === "active").length;
-  const rss = process.memoryUsage().rss;
-  json(res, { total_sessions: sessions.length, active_sessions: active, worker_rss_bytes: rss });
-}
-var db3, dispatch2;
-var init_api = __esm({
-  "src/worker/api.js"() {
+var require_api = __commonJS({
+  "src/worker/api.js"(exports2, module2) {
     "use strict";
-    db3 = (init_db(), __toCommonJS(db_exports));
-    ({ dispatch: dispatch2 } = (init_hooks(), __toCommonJS(hooks_exports)));
-    api_exports.handleHook = handleHook;
-    api_exports.handlePing = handlePing;
-    api_exports.handleListSessions = handleListSessions;
-    api_exports.handleGetSession = handleGetSession;
-    api_exports.handleGetGraph = handleGetGraph;
-    api_exports.handleGetActivity = handleGetActivity;
-    api_exports.handleGetTokens = handleGetTokens;
-    api_exports.handleStats = handleStats;
+    var db = require_db();
+    var { dispatch } = require_hooks();
+    function json(res, data, status = 200) {
+      const body = JSON.stringify(data);
+      res.writeHead(status, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.end(body);
+    }
+    function parseBody(req) {
+      return new Promise((resolve, reject) => {
+        let data = "";
+        req.on("data", (c) => {
+          data += c;
+          if (data.length > 1e7) reject(new Error("too large"));
+        });
+        req.on("end", () => {
+          try {
+            resolve(JSON.parse(data || "{}"));
+          } catch {
+            resolve({});
+          }
+        });
+        req.on("error", reject);
+      });
+    }
+    async function handleHook(req, res) {
+      const body = await parseBody(req);
+      const eventType = body.event_type || body.hook_event_name || req.url.split("/").pop();
+      const type = body.vis_event_type || eventType;
+      dispatch(type, body.payload || body);
+      json(res, { ok: true });
+    }
+    function handlePing(req, res) {
+      json(res, { ok: true, timestamp: Date.now() });
+    }
+    function handleListSessions(req, res) {
+      json(res, db.listSessions());
+    }
+    function handleGetSession(req, res, session_id) {
+      const session = db.getSession(session_id);
+      if (!session) return json(res, { error: "not found" }, 404);
+      json(res, session);
+    }
+    function handleGetGraph(req, res, session_id) {
+      json(res, db.getGraphData(session_id));
+    }
+    function handleGetActivity(req, res, session_id) {
+      const url = new URL(req.url, "http://localhost");
+      const limit = parseInt(url.searchParams.get("limit") || "200", 10);
+      const offset = parseInt(url.searchParams.get("offset") || "0", 10);
+      json(res, db.getActivityLog(session_id, limit, offset));
+    }
+    function handleGetTokens(req, res, session_id) {
+      json(res, db.getTokenBreakdown(session_id));
+    }
+    function handleStats(req, res) {
+      const sessions = db.listSessions();
+      const active = sessions.filter((s) => s.status === "active").length;
+      const rss = process.memoryUsage().rss;
+      json(res, { total_sessions: sessions.length, active_sessions: active, worker_rss_bytes: rss });
+    }
+    module2.exports = {
+      handleHook,
+      handlePing,
+      handleListSessions,
+      handleGetSession,
+      handleGetGraph,
+      handleGetActivity,
+      handleGetTokens,
+      handleStats
+    };
   }
 });
 
 // src/worker/index.js
 var http = require("http");
-var fs3 = require("fs");
-var path2 = require("path");
-var os2 = require("os");
-var DATA_DIR2 = process.env.CLAUDE_VIS_DATA_DIR || path2.join(os2.homedir(), ".claude-visualiser");
-var PID_FILE = path2.join(DATA_DIR2, "worker.pid");
+var fs = require("fs");
+var path = require("path");
+var os = require("os");
+var DATA_DIR = process.env.CLAUDE_VIS_DATA_DIR || path.join(os.homedir(), ".claude-visualiser");
+var PID_FILE = path.join(DATA_DIR, "worker.pid");
 var PORT = 37778;
 var HOST = "127.0.0.1";
 var mode = process.argv[2];
@@ -4156,11 +4138,12 @@ function readStdin() {
     }
     const chunks = [];
     process.stdin.on("data", (c) => chunks.push(c));
-    process.stdin.on("end", () => resolve(chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8").replace(/^﻿/, "") : null));
+    const join = () => chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8").replace(/^﻿/, "") : null;
+    process.stdin.on("end", () => resolve(join()));
     process.stdin.on("error", () => resolve(null));
     setTimeout(() => {
       process.stdin.removeAllListeners();
-      resolve(chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8").replace(/^﻿/, "") : null);
+      resolve(join());
     }, 3e3);
   });
 }
@@ -4201,12 +4184,12 @@ function postHook(data) {
 }
 function startServerProcess() {
   const { spawn } = require("child_process");
-  const wrapperPath = path2.join(__dirname, "worker-wrapper.cjs");
-  const target = fs3.existsSync(wrapperPath) ? wrapperPath : __filename;
+  const wrapperPath = path.join(__dirname, "worker-wrapper.cjs");
+  const target = fs.existsSync(wrapperPath) ? wrapperPath : __filename;
   const child = spawn(process.execPath, [target], {
     detached: true,
     stdio: "ignore",
-    env: { ...process.env, CLAUDE_VIS_DATA_DIR: DATA_DIR2 }
+    env: { ...process.env, CLAUDE_VIS_DATA_DIR: DATA_DIR }
   });
   child.unref();
 }
@@ -4217,9 +4200,9 @@ function runServer() {
   if (isServerAlreadyRunning()) {
     process.exit(0);
   }
-  fs3.mkdirSync(DATA_DIR2, { recursive: true });
-  const api = (init_api(), __toCommonJS(api_exports));
-  const { attachWebSocket: attachWebSocket2 } = (init_ws(), __toCommonJS(ws_exports));
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const api = require_api();
+  const { attachWebSocket } = require_ws2();
   const server = http.createServer((req, res) => {
     const urlPath = req.url.split("?")[0];
     if (req.method === "OPTIONS") {
@@ -4241,7 +4224,7 @@ function runServer() {
     }
     serveStatic(req, res, urlPath);
   });
-  attachWebSocket2(server);
+  attachWebSocket(server);
   server.listen(PORT, HOST, () => {
     writePid();
     console.log(`[vis-worker] listening on http://${HOST}:${PORT}`);
@@ -4257,14 +4240,14 @@ function runServer() {
 }
 function isServerAlreadyRunning() {
   try {
-    if (!fs3.existsSync(PID_FILE)) return false;
-    const pid = parseInt(fs3.readFileSync(PID_FILE, "utf-8").trim(), 10);
+    if (!fs.existsSync(PID_FILE)) return false;
+    const pid = parseInt(fs.readFileSync(PID_FILE, "utf-8").trim(), 10);
     if (!pid || isNaN(pid)) return false;
     process.kill(pid, 0);
     return true;
   } catch {
     try {
-      fs3.unlinkSync(PID_FILE);
+      fs.unlinkSync(PID_FILE);
     } catch {
     }
     return false;
@@ -4272,34 +4255,34 @@ function isServerAlreadyRunning() {
 }
 function writePid() {
   try {
-    fs3.writeFileSync(PID_FILE, String(process.pid));
+    fs.writeFileSync(PID_FILE, String(process.pid));
   } catch {
   }
 }
 function gracefulShutdown(server) {
   try {
-    fs3.unlinkSync(PID_FILE);
+    fs.unlinkSync(PID_FILE);
   } catch {
   }
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 3e3);
 }
-var UI_DIR = path2.join(__dirname, "..", "..", "ui");
+var UI_DIR = path.join(__dirname, "..", "..", "ui");
 var MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".woff2": "font/woff2" };
 function serveStatic(req, res, urlPath) {
   let filePath;
   if (urlPath === "/" || urlPath === "") {
-    filePath = path2.join(UI_DIR, "index.html");
+    filePath = path.join(UI_DIR, "index.html");
   } else if (urlPath.startsWith("/ui/")) {
-    filePath = path2.join(UI_DIR, urlPath.slice(4));
+    filePath = path.join(UI_DIR, urlPath.slice(4));
   } else {
     res.writeHead(404);
     res.end("not found");
     return;
   }
   try {
-    const data = fs3.readFileSync(filePath);
-    const ext = path2.extname(filePath);
+    const data = fs.readFileSync(filePath);
+    const ext = path.extname(filePath);
     res.writeHead(200, { "Content-Type": MIME[ext] || "application/octet-stream" });
     res.end(data);
   } catch {

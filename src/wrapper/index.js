@@ -1,4 +1,3 @@
-#!/usr/bin/env bun
 'use strict';
 
 const { spawn, execSync } = require('child_process');

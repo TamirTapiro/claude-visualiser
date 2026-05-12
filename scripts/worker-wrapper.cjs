@@ -1,5 +1,4 @@
 #!/usr/bin/env bun
-#!/usr/bin/env bun
 "use strict";
 "use strict";
 
