@@ -35,7 +35,8 @@ Modelled after [claude-mem](https://github.com/thedotmack/claude-mem) — same h
 ## Installation
 
 ```bash
-claude plugins install github:TamirTapiro/claude-visualiser
+claude plugins marketplace add TamirTapiro/claude-visualiser
+claude plugins install claude-visualiser
 ```
 
 After installation every new Claude session automatically:
