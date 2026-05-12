@@ -24,8 +24,15 @@ function findBun() {
 
   if (pathCheck.status === 0 && pathCheck.stdout.trim()) {
     if (IS_WINDOWS) {
-      const bunCmdPath = pathCheck.stdout.split('\n').find(l => l.trim().endsWith('bun.cmd'));
-      if (bunCmdPath) return bunCmdPath.trim();
+      const lines = pathCheck.stdout.split('\n').map(l => l.trim()).filter(Boolean);
+      // Prefer .exe — windowsHide:true only suppresses the directly spawned process,
+      // not cmd.exe's children, so .cmd wrappers still show a window.
+      const exePath = lines.find(l => l.toLowerCase().endsWith('bun.exe'));
+      if (exePath) return exePath;
+      const cmdPath = lines.find(l => l.toLowerCase().endsWith('bun.cmd'));
+      if (cmdPath) return cmdPath;
+      if (lines[0]) return lines[0];
+      return null;
     }
     return 'bun';
   }
@@ -94,12 +101,15 @@ const spawnOptions = { stdio: ['pipe', 'inherit', 'inherit'], windowsHide: true,
 let spawnCmd = bunPath;
 let spawnArgs = args;
 
-if (IS_WINDOWS) {
+if (IS_WINDOWS && bunPath.toLowerCase().endsWith('.cmd')) {
+  // .cmd files require shell:true, but windowsHide won't reach bun.exe through cmd.exe.
+  // This is a fallback only — findBun() prefers .exe to avoid this path.
   const quote = s => `"${String(s).replace(/"/g, '\\"')}"`;
   spawnOptions.shell = true;
   spawnCmd = [bunPath, ...args].map(quote).join(' ');
   spawnArgs = [];
 }
+// For .exe: spawn directly — windowsHide:true applies to bun.exe itself, no window.
 
 const child = spawn(spawnCmd, spawnArgs, spawnOptions);
 

@@ -4268,7 +4268,7 @@ function gracefulShutdown(server) {
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 3e3);
 }
-var UI_DIR = path.join(__dirname, "..", "..", "ui");
+var UI_DIR = path.join(__dirname, "..", "ui");
 var MIME = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".woff2": "font/woff2" };
 function serveStatic(req, res, urlPath) {
   let filePath;
