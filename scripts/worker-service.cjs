@@ -3977,9 +3977,10 @@ var require_hooks = __commonJS({
           for (const line of lines) {
             try {
               const entry = JSON.parse(line);
-              if (entry.usage) {
-                prompt_tokens += entry.usage.input_tokens ?? 0;
-                completion_tokens += entry.usage.output_tokens ?? 0;
+              const usage = entry.usage || entry.message && entry.message.usage;
+              if (usage) {
+                prompt_tokens += usage.input_tokens ?? 0;
+                completion_tokens += usage.output_tokens ?? 0;
               }
             } catch {
             }
