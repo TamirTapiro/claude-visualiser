@@ -1,6 +1,3 @@
-#!/usr/bin/env bun
-#!/usr/bin/env bun
-"use strict";
 "use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
@@ -215,23 +212,21 @@ var init_db = __esm({
     DATA_DIR = process.env.CLAUDE_VIS_DATA_DIR || path.join(os.homedir(), ".claude-visualiser");
     DB_PATH = path.join(DATA_DIR, "data.db");
     db = null;
-    module.exports = {
-      getDb,
-      upsertSession,
-      touchSession,
-      markSessionIdle,
-      updateContextSummary,
-      listSessions,
-      getSession,
-      upsertAgent,
-      markAgentEnded,
-      getAgentsBySession,
-      insertToolCall,
-      getActivityLog,
-      getGraphData,
-      insertTokenUsage,
-      getTokenBreakdown
-    };
+    db_exports.getDb = getDb;
+    db_exports.upsertSession = upsertSession;
+    db_exports.touchSession = touchSession;
+    db_exports.markSessionIdle = markSessionIdle;
+    db_exports.updateContextSummary = updateContextSummary;
+    db_exports.listSessions = listSessions;
+    db_exports.getSession = getSession;
+    db_exports.upsertAgent = upsertAgent;
+    db_exports.markAgentEnded = markAgentEnded;
+    db_exports.getAgentsBySession = getAgentsBySession;
+    db_exports.insertToolCall = insertToolCall;
+    db_exports.getActivityLog = getActivityLog;
+    db_exports.getGraphData = getGraphData;
+    db_exports.insertTokenUsage = insertTokenUsage;
+    db_exports.getTokenBreakdown = getTokenBreakdown;
   }
 });
 
@@ -3902,7 +3897,8 @@ var init_ws = __esm({
     "use strict";
     ({ WebSocketServer, WebSocket } = require_ws());
     wss = null;
-    module.exports = { attachWebSocket, broadcast };
+    ws_exports.attachWebSocket = attachWebSocket;
+    ws_exports.broadcast = broadcast;
   }
 });
 
@@ -3947,6 +3943,7 @@ function handleToolUse(payload) {
   const duration_ms = payload.duration_ms ?? null;
   const input_bytes = payload.tool_input ? JSON.stringify(payload.tool_input).length : 0;
   const output_bytes = payload.tool_response ? JSON.stringify(payload.tool_response).length : 0;
+  ensureSession(payload);
   db2.touchSession(session_id);
   db2.upsertAgent({ agent_id, session_id, parent_id: `main:${session_id}` === agent_id ? null : `main:${session_id}` });
   db2.insertToolCall({ session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes });
@@ -4031,7 +4028,7 @@ var init_hooks = __esm({
     fs2 = require("fs");
     db2 = (init_db(), __toCommonJS(db_exports));
     ({ broadcast: broadcast2 } = (init_ws(), __toCommonJS(ws_exports)));
-    module.exports = { dispatch };
+    hooks_exports.dispatch = dispatch;
   }
 });
 
@@ -4101,16 +4098,14 @@ var init_api = __esm({
     "use strict";
     db3 = (init_db(), __toCommonJS(db_exports));
     ({ dispatch: dispatch2 } = (init_hooks(), __toCommonJS(hooks_exports)));
-    module.exports = {
-      handleHook,
-      handlePing,
-      handleListSessions,
-      handleGetSession,
-      handleGetGraph,
-      handleGetActivity,
-      handleGetTokens,
-      handleStats
-    };
+    api_exports.handleHook = handleHook;
+    api_exports.handlePing = handlePing;
+    api_exports.handleListSessions = handleListSessions;
+    api_exports.handleGetSession = handleGetSession;
+    api_exports.handleGetGraph = handleGetGraph;
+    api_exports.handleGetActivity = handleGetActivity;
+    api_exports.handleGetTokens = handleGetTokens;
+    api_exports.handleStats = handleStats;
   }
 });
 
@@ -4161,11 +4156,11 @@ function readStdin() {
     }
     const chunks = [];
     process.stdin.on("data", (c) => chunks.push(c));
-    process.stdin.on("end", () => resolve(chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8") : null));
+    process.stdin.on("end", () => resolve(chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8").replace(/^﻿/, "") : null));
     process.stdin.on("error", () => resolve(null));
     setTimeout(() => {
       process.stdin.removeAllListeners();
-      resolve(chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8") : null);
+      resolve(chunks.length > 0 ? Buffer.concat(chunks).toString("utf-8").replace(/^﻿/, "") : null);
     }, 3e3);
   });
 }

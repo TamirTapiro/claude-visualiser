@@ -54,9 +54,10 @@ function readStdin() {
     if (process.stdin.isTTY) { resolve(null); return; }
     const chunks = [];
     process.stdin.on('data', c => chunks.push(c));
-    process.stdin.on('end', () => resolve(chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8') : null));
+    const join = () => chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8').replace(/^﻿/, '') : null;
+    process.stdin.on('end', () => resolve(join()));
     process.stdin.on('error', () => resolve(null));
-    setTimeout(() => { process.stdin.removeAllListeners(); resolve(chunks.length > 0 ? Buffer.concat(chunks).toString('utf-8') : null); }, 3000);
+    setTimeout(() => { process.stdin.removeAllListeners(); resolve(join()); }, 3000);
   });
 }
 

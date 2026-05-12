@@ -49,6 +49,7 @@ function handleToolUse(payload) {
   const input_bytes = payload.tool_input ? JSON.stringify(payload.tool_input).length : 0;
   const output_bytes = payload.tool_response ? JSON.stringify(payload.tool_response).length : 0;
 
+  ensureSession(payload);
   db.touchSession(session_id);
   db.upsertAgent({ agent_id, session_id, parent_id: `main:${session_id}` === agent_id ? null : `main:${session_id}` });
   db.insertToolCall({ session_id, agent_id, tool_name, duration_ms, input_bytes, output_bytes });
