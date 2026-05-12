@@ -6,6 +6,5 @@
   "repository": "https://github.com/TamirTapiro/claude-visualiser",
   "license": "MIT",
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.json",
   "keywords": ["claude", "claude-code", "visualiser", "monitoring", "agents", "tools"]
 }
