@@ -13,19 +13,12 @@ function getDb() {
   if (db) return db;
   fs.mkdirSync(DATA_DIR, { recursive: true });
 
-  // Require from the npm-installed location in ~/.claude-visualiser/
-  const sqlitePath = path.join(DATA_DIR, 'node_modules', 'better-sqlite3');
-  let Database;
-  try {
-    Database = require(sqlitePath);
-  } catch {
-    // Fallback: try global node_modules
-    Database = require('better-sqlite3');
-  }
+  // bun:sqlite is Bun's built-in SQLite — no native addon needed
+  const { Database } = require('bun:sqlite');
 
   db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('synchronous = NORMAL');
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA synchronous = NORMAL');
   initSchema(db);
   return db;
 }
@@ -112,13 +105,20 @@ function updateContextSummary(session_id, summary) {
 function listSessions() {
   return getDb().prepare(`
     SELECT s.*,
-      COALESCE(SUM(tu.prompt_tokens), 0)     AS total_prompt_tokens,
-      COALESCE(SUM(tu.completion_tokens), 0) AS total_completion_tokens,
-      COUNT(DISTINCT tc.id)                  AS total_tool_calls
+      COALESCE(t.total_prompt_tokens, 0)     AS total_prompt_tokens,
+      COALESCE(t.total_completion_tokens, 0) AS total_completion_tokens,
+      COALESCE(tc.total_tool_calls, 0)       AS total_tool_calls
     FROM sessions s
-    LEFT JOIN token_usage tu ON tu.session_id = s.session_id
-    LEFT JOIN tool_calls tc  ON tc.session_id = s.session_id
-    GROUP BY s.session_id
+    LEFT JOIN (
+      SELECT session_id,
+        SUM(prompt_tokens)     AS total_prompt_tokens,
+        SUM(completion_tokens) AS total_completion_tokens
+      FROM token_usage GROUP BY session_id
+    ) t ON t.session_id = s.session_id
+    LEFT JOIN (
+      SELECT session_id, COUNT(*) AS total_tool_calls
+      FROM tool_calls GROUP BY session_id
+    ) tc ON tc.session_id = s.session_id
     ORDER BY s.last_activity DESC
   `).all();
 }

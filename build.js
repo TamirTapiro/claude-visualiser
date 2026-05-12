@@ -40,7 +40,7 @@ async function buildAll() {
     target: 'node18',
     format: 'cjs',
     outfile: resolve('scripts/worker-service.cjs'),
-    external: ['better-sqlite3'],
+    external: ['better-sqlite3', 'bun:sqlite'],
     banner: { js: '#!/usr/bin/env bun\n"use strict";' },
   });
 
